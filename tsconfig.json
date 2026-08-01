@@ -4,8 +4,11 @@
         "esModuleInterop": true,
         "target": "es6",
         "moduleResolution": "node",
+        "skipLibCheck": true,
         "sourceMap": true,
-        "outDir": "dist"
+        "outDir": "dist",
+        "rootDir": "."
     },
-    "lib": ["es2015"]
+    "lib": ["es2015"],
+    "include": ["src"]
 }

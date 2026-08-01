@@ -6,13 +6,33 @@ import { MBTICompatibilityChart } from './mbtiCompatibility';
 import excelToJson from 'convert-excel-to-json';
 import { generateEmails } from './generateEmail';
 
+const inputFilename = process.argv[2] ?? 'FinalResponse.xlsx';
 const result = excelToJson({
-    sourceFile: path.join(__dirname, '../FinalResponse.xlsx'),
+    sourceFile: path.resolve(process.cwd(), inputFilename),
     header: { // Skips row 1. Row 1 is header data
         rows: 1
     }
 });
 
+const responses = result['Form Responses 1'];
+if (!Array.isArray(responses)) {
+    throw new Error(`The spreadsheet "${inputFilename}" must contain a worksheet named "Form Responses 1".`);
+}
+
+function requiredNumber(value: unknown, field: string, name: string): number {
+    if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) {
+        throw new Error(`Missing ${field} for ${name}.`);
+    }
+
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) {
+        throw new Error(`Invalid ${field} for ${name}: ${String(value)}.`);
+    }
+
+    return numericValue;
+}
+
+const allIndividualInfoArr: IndividualInfo[] = [];
 const maleIndividualInfoArr: IndividualInfo[] = [];
 const femaleIndividualInfoArr: IndividualInfo[] = [];
 const otherGenderIndividualInfoArr: IndividualInfo[] = [];
@@ -21,13 +41,13 @@ const lookingForMaleIndividualInfoArr: IndividualInfo[] = [];
 const lookingForFemaleIndividualInfoArr: IndividualInfo[] = [];
 const lookingForOtherGenderIndividualInfoArr: IndividualInfo[] = [];
 
-result["Form Responses 1"].forEach(individual => {
+responses.forEach(individual => {
     const individualInfo: IndividualInfo = {
         name: individual['B'],
         email: individual['C'],
         instagram: individual['E'],
         gender: individual['F'],
-        age: individual['G'],
+        age: requiredNumber(individual['G'], 'age', individual['B']),
         preferredLanguage: individual['J'],
         mbti: individual['K'],
         pastRelationshipCount: individual['L'],
@@ -50,17 +70,17 @@ result["Form Responses 1"].forEach(individual => {
         routineOrNew: individual['AC'],
         valentineGift: individual['AD'],
         partnerGender: individual['AE'],
-        ageCeiling: individual['AG'],
-        ageFloor: individual['AH'],
+        ageCeiling: requiredNumber(individual['AG'], 'maximum age difference', individual['B']),
+        ageFloor: requiredNumber(individual['AH'], 'minimum age difference', individual['B']),
         casualOrSerious: individual['AI'], 
         relationshipTypePreference: individual['AJ'],
-        rankingRelationshipTypePreference: individual['AK'],
-        rankingPastRelationshipCount: individual['AL'],
+        rankingRelationshipTypePreference: requiredNumber(individual['AK'], 'relationship-type ranking', individual['B']),
+        rankingPastRelationshipCount: requiredNumber(individual['AL'], 'past-relationship ranking', individual['B']),
         contactPreference: individual['AM'],
         oppositeGenderBFFIsntProblem: individual['AN'],
         disagreementResolutionPreference: individual['AO'],
         contactFrequency: individual['AP'],
-        rankingContactFrequency: individual['AQ'],
+        rankingContactFrequency: requiredNumber(individual['AQ'], 'contact-frequency ranking', individual['B']),
         meetFrequency: individual['AR'],
         loveLanguage: individual['AS'],
         dateCoursePreference: individual['AT'],
@@ -80,6 +100,8 @@ result["Form Responses 1"].forEach(individual => {
         afterMatching: individual['BH'],
         taken: false,
     }
+
+    allIndividualInfoArr.push(individualInfo);
 
     if (individualInfo.gender === 'Male') {
         maleIndividualInfoArr.push(individualInfo);
@@ -116,13 +138,13 @@ function calculateTwoPeopleMatchPoints(targetPerson: IndividualInfo, potentialMa
         (potentialMatch.age < targetPersonPartnerAgeFloor || potentialMatch.age > targetPersonPartnerAgeCeiling)) {
         return matchPoint;
     }
-    if ((targetPerson.gender != potentialMatch.partnerGender) ||
-        (potentialMatch.gender != targetPerson.partnerGender)) {
+    if ((targetPerson.gender !== potentialMatch.partnerGender) ||
+        (potentialMatch.gender !== targetPerson.partnerGender)) {
         return matchPoint;
     }
 
     // Both are the same people
-    if (targetPerson.name === potentialMatch.name) {
+    if (targetPerson === potentialMatch) {
         return matchPoint;
     }
 
@@ -248,11 +270,15 @@ function calculateTwoPeopleMatchPoints(targetPerson: IndividualInfo, potentialMa
     if (targetPerson.rankingRelationshipTypePreference === potentialMatch.rankingRelationshipTypePreference 
         && targetPerson.relationshipTypePreference === potentialMatch.relationshipTypePreference) {
         matchPoint += targetPerson.rankingRelationshipTypePreference;
-    } else if (targetPerson.rankingRelationshipTypePreference === potentialMatch.rankingRelationshipTypePreference) { 
+    } else if (targetPerson.relationshipTypePreference === potentialMatch.relationshipTypePreference) {
         matchPoint += 1;
     }
 
-    // 
+    // Preferred contact method
+    if (targetPerson.contactPreference === potentialMatch.contactPreference) {
+        matchPoint += 1;
+    }
+
     if (targetPerson.oppositeGenderBFFIsntProblem === potentialMatch.oppositeGenderBFFIsntProblem) {
         matchPoint += 1;
     }
@@ -266,7 +292,7 @@ function calculateTwoPeopleMatchPoints(targetPerson: IndividualInfo, potentialMa
     if (targetPerson.rankingContactFrequency === potentialMatch.rankingContactFrequency 
         && targetPerson.contactFrequency === potentialMatch.contactFrequency) {        
         matchPoint += targetPerson.rankingContactFrequency;
-    } else if (targetPerson.rankingContactFrequency === potentialMatch.rankingContactFrequency) {
+    } else if (targetPerson.contactFrequency === potentialMatch.contactFrequency) {
         matchPoint += 1;
     }
 
@@ -346,7 +372,7 @@ function calculateTwoPeopleMatchPoints(targetPerson: IndividualInfo, potentialMa
     }
 
     // 
-    if (targetPerson.conversationPreference === potentialMatch.relationshipTypePreference) {
+    if (targetPerson.conversationPreference === potentialMatch.conversationPreference) {
         matchPoint += 1;
     }
 
@@ -380,8 +406,6 @@ function findMatches(targetPerson: IndividualInfo, potentialMatchesArr: Individu
         matchedCouplesArr.push([targetPerson, match])
         targetPerson.taken = true;
         match.taken = true;
-    } else {
-        unmatchedIndividualArr.push(targetPerson);
     }
 }
 
@@ -397,7 +421,11 @@ lookingForFemaleIndividualInfoArr.forEach(targetPerson => {
     findMatches(targetPerson, femaleIndividualInfoArr);
 });
 
-const fs = require('fs');
+allIndividualInfoArr.forEach(individual => {
+    if (!individual.taken) {
+        unmatchedIndividualArr.push(individual);
+    }
+});
 
 let successfulMatchesString: string = 'Total of ' + matchedCoupleNames.length + ' Matches Found:';
 let unmatchedIndividualString: string = `Total of ` + unmatchedIndividualArr.length + ' Unmatched Individuals:';
@@ -413,11 +441,11 @@ unmatchedIndividualArr.forEach((individual, ind) => {
 const resultReportString = successfulMatchesString + '\n\n' + unmatchedIndividualString;
 console.log(resultReportString);
 
-writeFile(path.join(__dirname, '../report.txt'), successfulMatchesString + '\n\n' + unmatchedIndividualString, err => {
+writeFile(path.join(process.cwd(), 'report.txt'), successfulMatchesString + '\n\n' + unmatchedIndividualString, err => {
     if (err) throw err;
 })
 
-writeFile(path.join(__dirname, '../email.txt'), generateEmails(matchedCouplesArr, unmatchedIndividualArr), err => {
+writeFile(path.join(process.cwd(), 'email.txt'), generateEmails(matchedCouplesArr, unmatchedIndividualArr), err => {
     if (err) throw err;
 })
 
