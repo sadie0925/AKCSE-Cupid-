@@ -1,0 +1,22 @@
+{
+  "name": "cupid",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/cupidalgo.js",
+  "scripts": {
+    "start": "tsc && node dist/cupidalgo.js",
+    "lint": "eslint . --ext .ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^17.0.21",
+    "@typescript-eslint/eslint-plugin": "^5.14.0",
+    "@typescript-eslint/parser": "^5.14.0",
+    "eslint": "^8.10.0"
+  },
+  "dependencies": {
+    "convert-excel-to-json": "^1.7.0"
+  }
+}

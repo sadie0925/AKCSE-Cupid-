@@ -1,0 +1,6 @@
+dist/
+node_modules/
+report.txt
+email.txt
+*.xlsx
+.DS_Store
